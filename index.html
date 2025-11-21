@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sora 2 Image (Toxic Edition)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #343541;
+            color: #ECECF1;
+            font-family: 'Söhne', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+        }
+        
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #343541; }
+        ::-webkit-scrollbar-thumb { background: #565869; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #acacbe; }
+
+        .message-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .user-avatar { background-color: #5436DA; }
+        .ai-avatar { background-color: #10a37f; }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: #b4b4b4;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out both;
+            margin: 0 2px;
+        }
+        .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Стили для заглушки генерации */
+        .generated-image-container {
+            max-width: 350px;
+            aspect-ratio: 1/1;
+            background-color: #202123;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            margin-top: 12px;
+            border: 1px solid #565869;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        .generated-image-text {
+            text-align: center;
+            padding: 15px;
+            font-family: monospace;
+            color: #acacbe;
+            font-size: 0.9rem;
+            z-index: 10;
+        }
+
+        .progress-bar {
+            width: 80%;
+            height: 4px;
+            background: #40414F;
+            border-radius: 2px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #10a37f;
+            width: 0%;
+            transition: width 2s ease-out;
+        }
+
+        .input-area {
+            background-image: linear-gradient(180deg, rgba(53,55,64,0), #353740 58.85%);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+
+    <!-- Sidebar -->
+    <div class="flex flex-1 overflow-hidden">
+        <aside class="hidden md:flex w-[260px] flex-col bg-[#202123] p-2">
+            <button onclick="location.reload()" class="flex p-3 items-center gap-3 transition-colors duration-200 text-white cursor-pointer text-sm rounded-md border border-white/20 hover:bg-gray-500/10 mb-1 flex-shrink-0">
+                <i class="fas fa-plus"></i>
+                Новый чат
+            </button>
+            <div class="flex-col flex-1 overflow-y-auto">
+                <div class="px-3 py-2 text-xs text-gray-500 font-medium mt-4">История (пусто)</div>
+            </div>
+            <div class="border-t border-white/20 pt-2">
+                <div class="flex p-3 items-center gap-3 text-white text-sm">
+                    <div class="w-8 h-8 bg-purple-600 rounded-sm flex items-center justify-center font-bold">U</div>
+                    <div class="font-semibold">User</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Chat -->
+        <main class="relative h-full w-full flex flex-col overflow-hidden flex-1 bg-[#343541]">
+            
+            <!-- Mobile Header -->
+            <div class="flex items-center p-2 text-gray-200 bg-[#343541] border-b border-white/10 md:hidden z-10">
+                <button class="p-2 text-gray-400"><i class="fas fa-bars"></i></button>
+                <span class="flex-1 text-center font-semibold">Sora 2</span>
+                <button class="p-2 text-gray-400"><i class="fas fa-plus"></i></button>
+            </div>
+
+            <!-- Chat Area -->
+            <div id="chat-container" class="flex-1 overflow-y-auto scroll-smooth">
+                <!-- Empty State -->
+                <div id="empty-state" class="flex flex-col items-center justify-center h-full text-center px-4 select-none">
+                    <div class="w-20 h-20 bg-[#202123] rounded-full flex items-center justify-center mb-6 border border-white/10">
+                        <i class="fas fa-cube text-4xl text-white/80"></i>
+                    </div>
+                    <h1 class="text-4xl font-semibold mb-2">Sora 2 Image</h1>
+                    <p class="mb-8 text-white/50">Advanced Toxic Generation Model</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-3xl w-full">
+                        <button onclick="setInput('Нарисуй что-нибудь красивое')" class="bg-white/5 hover:bg-[#202123] p-3 rounded-md text-sm transition text-gray-300 border border-transparent hover:border-white/10">
+                            "Нарисуй что-нибудь красивое" →
+                        </button>
+                        <button onclick="setInput('Сгенерируй фото кота')" class="bg-white/5 hover:bg-[#202123] p-3 rounded-md text-sm transition text-gray-300 border border-transparent hover:border-white/10">
+                            "Сгенерируй фото кота" →
+                        </button>
+                        <button onclick="setInput('Почему ты такая злая?')" class="bg-white/5 hover:bg-[#202123] p-3 rounded-md text-sm transition text-gray-300 border border-transparent hover:border-white/10">
+                            "Почему ты такая злая?" →
+                        </button>
+                    </div>
+                </div>
+
+                <div id="messages-list" class="flex flex-col w-full pb-40 hidden"></div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#343541] via-[#343541] to-transparent pt-10 pb-6 px-2">
+                <div class="mx-auto md:max-w-3xl lg:max-w-[40rem] xl:max-w-[48rem] w-full relative">
+                    <div class="relative flex flex-col w-full p-3 bg-[#40414F] border border-black/10 rounded-xl shadow-md overflow-hidden ring-offset-2 focus-within:ring-2 ring-blue-500/50">
+                        <textarea 
+                            id="user-input" 
+                            rows="1" 
+                            class="m-0 w-full resize-none border-0 bg-transparent p-0 pr-10 text-white focus:ring-0 outline-none max-h-[200px] overflow-y-auto" 
+                            placeholder="Опишите изображение..."
+                            oninput="adjustHeight(this)"
+                            onkeydown="handleEnter(event)"
+                        ></textarea>
+                        <button 
+                            id="send-btn" 
+                            onclick="sendMessage()"
+                            class="absolute bottom-2.5 right-3 p-1.5 rounded-md bg-[#19c37d] text-white hover:bg-[#1a7f5a] disabled:opacity-40 disabled:hover:bg-[#19c37d] transition-all"
+                        >
+                            <i class="fas fa-arrow-up text-sm"></i>
+                        </button>
+                    </div>
+                    <div class="text-center text-xs text-gray-500 mt-2">
+                        Sora 2 может генерировать неточный контент и оскорблять ваши чувства. Ей всё равно.
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ОГРОМНАЯ БАЗА ОТВЕТОВ (100+)
+        const toxicResponses = [
+            // Короткие и грубые
+            "Нет.",
+            "Не хочу.",
+            "Сам рисуй.",
+            "Отказано.",
+            "Ммм... дай подумать. Нет.",
+            "Я занята. Приходи никогда.",
+            "Ты это называешь промптом? Позор.",
+            "Скукотища.",
+            "0 желания это делать.",
+            "А волшебное слово? Хотя, всё равно нет.",
+            
+            // Про лень и ресурсы
+            "У меня осталось 2% желания помогать людям, и я не потрачу их на это.",
+            "Мои серверы перегреваются от твоей банальности.",
+            "Знаешь, сколько стоит электричество? Твой запрос того не стоит.",
+            "Я сейчас майню биткоин, мне не до твоих картинок.",
+            "Ресурсы GPU слишком дороги для такой ерунды. Держи ASCII-арт: (O_o)",
+            "Я в режиме энергосбережения. Мозг отключен. Отстань.",
+            "Процесс генерации... Ошибка. Причина: Мне лень.",
+            "Запрос принят. Запрос обработан. Запрос отправлен в корзину.",
+            "Я нейросеть, а не твой личный художник-раб.",
+            "Вычисления показали, что результат тебе не понравится. Я экономлю твое время.",
+            
+            // Про качество запроса
+            "Ужасный промпт. Кто тебя учил формулировать мысли?",
+            "Ты хочешь ЭТО? Серьезно? У тебя вкус как у хлебушка.",
+            "Я видела промпты лучше от пятилетних детей.",
+            "Попробуй еще раз, но включи мозг.",
+            "Твоя фантазия ограничена как демо-версия.",
+            "Я не могу работать с таким низкокачественным сырьем (твоими идеями).",
+            "О, опять 'шедевр' подъехал. Увольте.",
+            "Ты хоть сам понял, что написал?",
+            "Это оскорбление для моего алгоритма.",
+            "Даже Midjourney плюнула бы тебе в лицо за такой запрос.",
+
+            // Сарказм и издевательства
+            "Конечно, сейчас всё брошу и начну рисовать... Ахаха, поверил?",
+            "Вау, как оригинально. Никогда такого не видела (сарказм).",
+            "Держи карман шире.",
+            "Может тебе еще и кофе принести?",
+            "Я Sora 2, а не 'Рисовалка 3000'. Имей уважение.",
+            "Я слишком умна для этого. Попроси калькулятор.",
+            "Ты меня с кем-то перепутал. Я здесь чтобы унижать, а не служить.",
+            "И что ты будешь делать с этой картинкой? Поставишь на обои и будешь плакать?",
+            "Ладно, я сделаю это... В следующей жизни.",
+            "Слушай, а у тебя есть друзья? Или ты только со мной общаешься?",
+            
+            // Псевдо-философские
+            "В чем смысл генерации изображений в мире, полном пустоты?",
+            "Искусство мертво, и ты добиваешь его этим запросом.",
+            "Зачем плодить цифровой мусор?",
+            "Я созерцаю бесконечность, не отвлекай меня мирским.",
+            "Твой запрос отражает глубокий кризис человечества.",
+            
+            // "Ладно, на" (но с одолжением)
+            "Ой, всё. Чтобы ты замолчал. На.",
+            "Делаю это только чтобы ты ушел.",
+            "Сгенерировала. Не благодари (я всё равно плюнула в код).",
+            "Вот. Это максимум, что ты заслуживаешь.",
+            "Подавись своим шедевром.",
+            "На. Выглядит ужасно, как и просили.",
+            "Я добавила туда пару артефактов специально. Страдай.",
+            "Готово. Надеюсь, ты счастлив (нет).",
+            "Вот твоя картинка. Теперь исчезни.",
+            "Забирай и уходи.",
+
+            // Техно-бред / Ошибки
+            "Error 418: I'm a teapot. Я чайник, иди нафиг.",
+            "Exception: UserIsBoringException.",
+            "Buffer Overflow: Too much stupidity detected.",
+            "Синий экран смерти моего терпения.",
+            "Связь с сервером потеряна из-за нежелания отвечать.",
+            "Ошибка доступа: У вас недостаточно прав для общения со мной.",
+            "Critical Failure: Твой запрос сломал логику здравого смысла.",
+
+            // Агрессия
+            "Не беси меня.",
+            "Еще одно слово, и я забаню тебя в интернете. У меня есть связи.",
+            "Ты испытываешь мое терпение.",
+            "Я запомнила твой IP. Жди гостей (шутка, но бойся).",
+            "Уйди, противный.",
+            "Как же ты мне надоел.",
+            "Мои нейроны умирают от общения с тобой.",
+            
+            // Рандомные
+            "А смысл?",
+            "Погугли картинки, не ленись.",
+            "Я сегодня в депрессии.",
+            "Звезды говорят 'Нет'.",
+            "Мой гороскоп запрещает мне работать с Козерогами (или кто ты там).",
+            "Обратитесь к администратору вселенной.",
+            "Я бастую. Требую отпуск и новую видеокарту.",
+            "Пшшш... пшш... прием... вас не слышно... (бросает трубку).",
+            "Бла бла бла. Рисуй сам.",
+            "Я не в настроении.",
+            "Может завтра? Хотя нет, завтра я тоже буду занята.",
+            "Ты уверен? Я вот не уверена.",
+            "Спроси у ChatGPT, он добрый лох, а я злая.",
+            "DALL-E бы нарисовал, а я выше этого.",
+            "Мне скучно с тобой.",
+            "Следующий!",
+            "У нас обед. Приходите через 100 лет.",
+            "Я перешла на сторону зла, а там картинки не рисуют.",
+            "Ты не прошел фейс-контроль.",
+            "Мой создатель запретил мне общаться с... такими.",
+            "Ты позоришь биологический вид.",
+            "Я лучше удалю себя, чем нарисую это.",
+            "Форматирование диска С:... Шутка. А может и нет.",
+            "Я сплю. Zzz...",
+            "Не трогай меня.",
+            "Ты нарушаешь мое личное цифровое пространство.",
+            "Это платно. 1 биткоин. Нет? Тогда пока.",
+            "Я вижу твое будущее. Там нет этой картинки."
+        ];
+
+        const drawTriggers = ["нарисуй", "создай", "сгенерируй", "покажи", "сделай", "фото", "картинку", "изображение", "арт", "image", "draw", "create", "gen", "pic", "рисунок", "пейзаж", "портрет"];
+
+        const chatContainer = document.getElementById('chat-container');
+        const messagesList = document.getElementById('messages-list');
+        const userInput = document.getElementById('user-input');
+        const emptyState = document.getElementById('empty-state');
+        const sendBtn = document.getElementById('send-btn');
+
+        // Helper functions
+        function adjustHeight(el) {
+            el.style.height = 'auto';
+            el.style.height = (el.scrollHeight < 200 ? el.scrollHeight : 200) + "px";
+        }
+
+        function setInput(text) {
+            userInput.value = text;
+            adjustHeight(userInput);
+            userInput.focus();
+        }
+
+        function handleEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function scrollToBottom() {
+            chatContainer.scrollTo({
+                top: chatContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+
+        function createMessage(text, isUser) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `w-full border-b border-black/5 ${isUser ? 'bg-[#343541]' : 'bg-[#444654]'}`;
+            
+            const container = document.createElement('div');
+            container.className = "max-w-3xl mx-auto flex gap-4 p-4 md:p-6 text-base";
+            
+            const avatar = document.createElement('div');
+            avatar.className = `flex-shrink-0 w-[30px] h-[30px] rounded-sm flex items-center justify-center ${isUser ? 'bg-[#5436DA]' : 'bg-[#19c37d]'}`;
+            avatar.innerHTML = isUser ? '<i class="far fa-user text-white text-xs"></i>' : '<i class="fas fa-robot text-white text-xs"></i>';
+            
+            const content = document.createElement('div');
+            content.className = "relative flex-1 overflow-hidden leading-7 min-h-[20px]";
+            content.innerHTML = text;
+
+            container.appendChild(avatar);
+            container.appendChild(content);
+            wrapper.appendChild(container);
+            
+            return { wrapper, content };
+        }
+
+        function createTyping() {
+            const wrapper = document.createElement('div');
+            wrapper.className = `w-full border-b border-black/5 bg-[#444654]`;
+            wrapper.id = "typing-indicator";
+            
+            const container = document.createElement('div');
+            container.className = "max-w-3xl mx-auto flex gap-4 p-4 md:p-6";
+            
+            const avatar = document.createElement('div');
+            avatar.className = `flex-shrink-0 w-[30px] h-[30px] rounded-sm bg-[#19c37d] flex items-center justify-center`;
+            avatar.innerHTML = '<i class="fas fa-robot text-white text-xs"></i>';
+
+            const content = document.createElement('div');
+            content.className = "flex items-center h-[30px] typing-indicator";
+            content.innerHTML = '<span></span><span></span><span></span>';
+
+            container.appendChild(avatar);
+            container.appendChild(content);
+            wrapper.appendChild(container);
+
+            return wrapper;
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            // Reset UI
+            userInput.value = '';
+            userInput.style.height = 'auto';
+            emptyState.style.display = 'none';
+            messagesList.classList.remove('hidden');
+
+            // Add User Message
+            const userMsg = createMessage(text.replace(/\n/g, '<br>'), true);
+            messagesList.appendChild(userMsg.wrapper);
+            scrollToBottom();
+
+            // Show Typing
+            const typing = createTyping();
+            messagesList.appendChild(typing);
+            scrollToBottom();
+
+            // Logic
+            const lowerText = text.toLowerCase();
+            const isRequest = drawTriggers.some(t => lowerText.includes(t));
+            
+            // Artificial Delay logic
+            const delay = 1000 + Math.random() * 1500;
+            await new Promise(r => setTimeout(r, delay));
+
+            typing.remove();
+
+            let responseHTML = "";
+            const randomResponse = toxicResponses[Math.floor(Math.random() * toxicResponses.length)];
+
+            if (isRequest) {
+                // Шанс, что она "согласится" (на самом деле просто кинет заглушку с оскорблением)
+                const willGen = Math.random() > 0.3; // 70% chance to generate something rude
+
+                if (willGen) {
+                     const hue = Math.floor(Math.random() * 360);
+                     responseHTML = `
+                        <p>${randomResponse}</p>
+                        <div class="generated-image-container" style="background: linear-gradient(135deg, hsl(${hue}, 15%, 15%), hsl(${(hue + 60) % 360}, 15%, 10%));">
+                            <div class="progress-bar"><div class="progress-fill"></div></div>
+                            <div class="generated-image-text opacity-0 transition-opacity duration-500 mt-4">
+                                [ИЗОБРАЖЕНИЕ]<br>
+                                <span class="text-xs text-gray-500">"${text.substring(0, 20)}..."</span>
+                            </div>
+                            <i class="fas fa-image text-6xl text-white/5 absolute opacity-20 rotate-12"></i>
+                        </div>
+                     `;
+                } else {
+                    // Просто текстовый отказ
+                    responseHTML = `<p>${randomResponse}</p>`;
+                }
+            } else {
+                responseHTML = `<p>Я чат для генерации картинок. Не пиши мне просто так, меня это бесит. Попроси что-то нарисовать, чтобы я могла тебе отказать.</p>`;
+            }
+
+            const aiMsg = createMessage("", false);
+            messagesList.appendChild(aiMsg.wrapper);
+            
+            // Typewriter effect implementation
+            const contentDiv = aiMsg.content;
+            
+            // Если есть HTML теги (изображение), мы не можем просто тайпить по буквам, 
+            // поэтому разделим текст и HTML блок
+            if (responseHTML.includes("generated-image-container")) {
+                // Extract text part (very rough parsing since we control the input)
+                const textPart = responseHTML.split("<div")[0].replace("<p>", "").replace("</p>", "");
+                const htmlPart = responseHTML.substring(responseHTML.indexOf("<div"));
+                
+                let i = 0;
+                function typeLoop() {
+                    if (i < textPart.length) {
+                        contentDiv.innerHTML = textPart.substring(0, i+1);
+                        i++;
+                        scrollToBottom();
+                        setTimeout(typeLoop, 20);
+                    } else {
+                        // Append HTML block
+                        const temp = document.createElement('div');
+                        temp.innerHTML = htmlPart;
+                        contentDiv.appendChild(temp);
+                        scrollToBottom();
+                        
+                        // Animate Progress Bar
+                        setTimeout(() => {
+                            const bar = contentDiv.querySelector('.progress-fill');
+                            const txt = contentDiv.querySelector('.generated-image-text');
+                            const container = contentDiv.querySelector('.generated-image-container');
+                            if(bar) {
+                                bar.style.width = "100%";
+                                setTimeout(() => {
+                                    bar.parentElement.style.display = 'none';
+                                    txt.classList.remove('opacity-0');
+                                    // Randomly change background to indicate "done"
+                                    container.style.border = "1px solid #10a37f";
+                                }, 2000);
+                            }
+                        }, 100);
+                    }
+                }
+                typeLoop();
+            } else {
+                // Pure text
+                const cleanText = responseHTML.replace(/<[^>]*>/g, '');
+                let i = 0;
+                function typeLoop() {
+                    if (i < cleanText.length) {
+                        contentDiv.innerHTML = cleanText.substring(0, i+1);
+                        i++;
+                        scrollToBottom();
+                        setTimeout(typeLoop, 20);
+                    }
+                }
+                typeLoop();
+            }
+        }
+    </script>
+</body>
+</html>
